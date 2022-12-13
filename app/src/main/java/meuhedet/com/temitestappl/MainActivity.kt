@@ -236,6 +236,13 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
             asrResult.contains("חדשות", ignoreCase = true) -> {
                 robot.askQuestion("על איזה נושא לחפש חדשות?")
             }
+            asrResult.contains("בסדר", ignoreCase = true) -> {
+                if (followService != null) {
+                    Log.i("FollowServiceStatus", "Customer said, that he is ok")
+                    followService!!.interrupt()
+                }
+                robot.speak(TtsRequest.create("שמח שאתה בסדר"))
+            }
             asrResult.contains("תספרי על", ignoreCase = true) -> {
                 val theme = asrResult.substring(8)
                 Log.i("NewsServiceAsr", "Theme for search news: $theme")
@@ -327,6 +334,10 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
 
     fun greeting(name: String) {
         robot.askQuestion("שלום $name. איך אוכל לעזור לך?")
+    }
+
+    fun askQuestion(question: String) {
+        robot.askQuestion(  question)
     }
 
     private fun call(name: String, userId: String) {
