@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.StrictMode
 import android.util.Log
@@ -18,9 +19,12 @@ import com.robotemi.sdk.Robot
 import com.robotemi.sdk.TtsRequest
 import com.robotemi.sdk.UserInfo
 import com.robotemi.sdk.constants.SdkConstants
+import com.robotemi.sdk.face.ContactModel
+import com.robotemi.sdk.face.OnFaceRecognizedListener
 import com.robotemi.sdk.listeners.OnBeWithMeStatusChangedListener
 import com.robotemi.sdk.listeners.OnGoToLocationStatusChangedListener
 import com.robotemi.sdk.listeners.OnRobotReadyListener
+import com.robotemi.sdk.model.CallEventModel
 import meuhedet.com.temitestappl.dto.ResponseCameraDto
 import meuhedet.com.temitestappl.retrofit.RetrofitClient
 import meuhedet.com.temitestappl.services.*
@@ -33,7 +37,10 @@ import java.io.File
 
 
 class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListener,
-    OnBeWithMeStatusChangedListener, Robot.WakeupWordListener, OnGoToLocationStatusChangedListener {
+    OnBeWithMeStatusChangedListener, Robot.WakeupWordListener, OnGoToLocationStatusChangedListener,
+    OnFaceRecognizedListener {
+
+    // ========================== App components =================================================
 
     private lateinit var robot: Robot
     private lateinit var buttonPharmacy: Button
@@ -42,50 +49,35 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
     private lateinit var buttonFaceRecognition: Button
     private lateinit var buttonFindDoctor: Button
     private lateinit var buttonPlayMovie: Button
+    private lateinit var buttonStopAlarm: Button
     private var contactsAfterFilter: List<UserInfo> = emptyList()
     private var followService: FollowService? = null
     private var botService = ChatBotService()
     private var newsService = NewsService()
     private var queueService = QueueService()
+    private var alarmService: AlarmService? = null
     private lateinit var mProgressDialog: ProgressDialog
     private var retrofit = RetrofitClient.getClient()
     private var client = retrofit.create(FaceRecognitionService::class.java)
+    private var mediaPlayer: MediaPlayer? = null
+    private var isAlarm = false
 
+    // ========================== Static fields ==================================================
 
     companion object {
         @SuppressLint("StaticFieldLeak")
         lateinit var instance: MainActivity
     }
 
+    // ========================== Buttons Listeners ===============================================
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+    private fun buttonStopAlarm(buttonStopAlarm: Button) {
+        buttonStopAlarm.setOnClickListener {
+            if (alarmService != null) {
+                alarmService!!.interrupt()
+            }
+        }
 
-        val apiKey = BuildConfig.GOOGLE_API_KEY
-        System.setProperty("GOOGLE_API_KEY", apiKey)
-        val policy = StrictMode.ThreadPolicy.Builder().permitAll().build()
-        StrictMode.setThreadPolicy(policy)
-
-        instance = this
-        buttonPharmacy = findViewById(R.id.button_pharmacy)
-        buttonDoctor = findViewById(R.id.button_doctor)
-        buttonQuestionnaire = findViewById(R.id.button_questionnaire)
-        buttonFaceRecognition = findViewById(R.id.button_face_recognition)
-        buttonFindDoctor = findViewById(R.id.button_find_doctor)
-        buttonPlayMovie = findViewById(R.id.button_play_movie)
-        mProgressDialog = ProgressDialog(this)
-        mProgressDialog.isIndeterminate = true
-        mProgressDialog.setMessage("Loading...")
-        LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver, IntentFilter("photoPath"))
-        robot = Robot.getInstance()
-
-        buttonPharmacyAction(buttonPharmacy)
-        buttonDoctorAction(buttonDoctor)
-        buttonQuestionnaireAction(buttonQuestionnaire)
-        buttonFaceRecognitionAction(buttonFaceRecognition)
-        buttonFindDoctorAction(buttonFindDoctor)
-        buttonPlayMovie(buttonPlayMovie)
     }
 
     private fun buttonPlayMovie(buttonPlayMovie: Button) {
@@ -143,18 +135,39 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
         }
     }
 
-    fun findDoctor(doctorName: String) {
-        val nameWithoutSpace = doctorName.filter { !it.isWhitespace() }
-        Log.i("Find doctor", "Receive doctor's name $nameWithoutSpace")
-        Log.i("Find doctor", "List of locations ${robot.locations}")
-        for(location in robot.locations) {
-            if (location.equals(nameWithoutSpace, true)) {
-                robot.speak(TtsRequest.create("Please, follow me", true, TtsRequest.Language.EN_US))
-                robot.goTo(nameWithoutSpace)
-                return
-            }
-        }
-        robot.speak(TtsRequest.create("Couldn't find doctor with this name", true, TtsRequest.Language.EN_US))
+    // ========================== Temi and Android function =======================================
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        val apiKey = BuildConfig.GOOGLE_API_KEY
+        System.setProperty("GOOGLE_API_KEY", apiKey)
+        val policy = StrictMode.ThreadPolicy.Builder().permitAll().build()
+        StrictMode.setThreadPolicy(policy)
+
+        instance = this
+        buttonPharmacy = findViewById(R.id.button_pharmacy)
+        buttonDoctor = findViewById(R.id.button_doctor)
+        buttonQuestionnaire = findViewById(R.id.button_questionnaire)
+        buttonFaceRecognition = findViewById(R.id.button_face_recognition)
+        buttonFindDoctor = findViewById(R.id.button_find_doctor)
+        buttonPlayMovie = findViewById(R.id.button_play_movie)
+        buttonStopAlarm = findViewById(R.id.button_stop_alarm)
+        mProgressDialog = ProgressDialog(this)
+        mProgressDialog.isIndeterminate = true
+        mProgressDialog.setMessage("Loading...")
+        LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver, IntentFilter("photoPath"))
+        robot = Robot.getInstance()
+        mediaPlayer = MediaPlayer.create(this, R.raw.siren)
+
+        buttonPharmacyAction(buttonPharmacy)
+        buttonDoctorAction(buttonDoctor)
+        buttonQuestionnaireAction(buttonQuestionnaire)
+        buttonFaceRecognitionAction(buttonFaceRecognition)
+        buttonFindDoctorAction(buttonFindDoctor)
+        buttonPlayMovie(buttonPlayMovie)
+        buttonStopAlarm(buttonStopAlarm)
     }
 
     override fun onStart() {
@@ -163,9 +176,10 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
             while (true) {
                 if (MailService.check()) {
                     Log.i("MailServiceCheck", "Started trigger")
-                    callHelp("ניקיטה דורושנקו")
+                    runAlarm()
+//                    callHelp("ניקיטה דורושנקו")
                 }
-                Thread.sleep(10000)
+                Thread.sleep(5000)
             }
         }
         t.start()
@@ -174,6 +188,7 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
         robot.addOnBeWithMeStatusChangedListener(this)
         robot.addWakeupWordListener(this)
         robot.addOnGoToLocationStatusChangedListener(this)
+        robot.addOnFaceRecognizedListener(this)
 
     }
 
@@ -189,11 +204,13 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
         robot.removeOnBeWithMeStatusChangedListener(this)
         robot.removeWakeupWordListener(this)
         robot.removeOnGoToLocationStatusChangedListener(this)
+        robot.removeOnFaceRecognizedListener(this)
     }
 
     override fun onRobotReady(isReady: Boolean) {
         if (isReady) {
             try {
+                Log.i("DetectionMode", "Is detection mode: ${robot.detectionModeOn}")
                 robot.requestToBeKioskApp()
                 Log.i("SelectedKiosk", "Is selected kiosk: ${robot.isSelectedKioskApp()}")
                 robot.tiltBy(55, 0.5f)
@@ -224,8 +241,11 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
                 robot.askQuestion(getString(R.string.הצילו))
             }
             asrResult.contains("תתקשרי", ignoreCase = true) -> {
-                val name = asrResult.substring(8)
-                callHelp(name)
+                if(asrResult.length >= 8) {
+                    val name = asrResult.substring(8)
+                    callHelp(name)
+                }
+
             }
             asrResult.contains("שגיאה", ignoreCase = true) -> {
                 robot.askQuestion(getString(R.string.שגיאה))
@@ -241,7 +261,7 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
                     Log.i("FollowServiceStatus", "Customer said, that he is ok")
                     followService!!.interrupt()
                 }
-                robot.speak(TtsRequest.create("שמח שאתה בסדר"))
+                speak("שמח שאתה בסדר")
             }
             asrResult.contains("תספרי על", ignoreCase = true) -> {
                 val theme = asrResult.substring(8)
@@ -254,7 +274,7 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
                 }
                 if (quantityArticles == 1) {
                     val article = articles.get(0)
-                    return robot.speak(TtsRequest.create(article.description))
+                    return speak(article.description)
                 } else {
                     val numberOfArticle = (0..quantityArticles - 1).random()
                     val article = articles.get(numberOfArticle)
@@ -288,10 +308,6 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
 
     }
 
-    private fun isNumeric(assistantResponse: String): Boolean {
-        return assistantResponse.all { char -> char.isDigit() }
-    }
-
     override fun onBeWithMeStatusChanged(status: String) {
         Log.i("FollowServiceStatus", "status $status")
         if (status.equals("search")) {
@@ -305,6 +321,48 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
                 followService!!.interrupt()
             }
         }
+    }
+
+    override fun onGoToLocationStatusChanged(location: String, status: String,
+                                             descriptionId: Int, description: String) {
+        Log.i("Location", location)
+        Log.i("Location status", status)
+        Log.i("Location description", description)
+    }
+
+    override fun onFaceRecognized(contactModelList: List<ContactModel>) {
+        Log.i("Face Recognize listener", "Listener start")
+        contactModelList.forEach {
+            greeting(it.firstName)
+        }
+        robot.stopFaceRecognition()
+
+    }
+
+    override fun onWakeupWord(wakeupWord: String, direction: Int) {
+        // ====================== Face recognition with Python server ================================
+//        robot.tiltBy(55, 0.5f)
+//        Log.i("WakeUp", "Wake up world $wakeupWord")
+//        val serviceIntent = Intent(this, CameraService::class.java)
+//        startService(serviceIntent)
+        // ====================== Face recognition with Temi center ================================
+        robot.startFaceRecognition()
+    }
+
+    // ========================== My function ====================================================
+
+    fun findDoctor(doctorName: String) {
+        val nameWithoutSpace = doctorName.filter { !it.isWhitespace() }
+        Log.i("Find doctor", "Receive doctor's name $nameWithoutSpace")
+        Log.i("Find doctor", "List of locations ${robot.locations}")
+        for(location in robot.locations) {
+            if (location.equals(nameWithoutSpace, true)) {
+                speak("אנא עקוב אחריי")
+                robot.goTo(nameWithoutSpace)
+                return
+            }
+        }
+        speak("לא הצלחתי למצוא רופא עם השם הזה")
     }
 
     fun callHelp(name: String) {
@@ -340,21 +398,21 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
         robot.askQuestion(  question)
     }
 
+    fun speak(text:String) {
+        robot.speak(TtsRequest.create(text, true))
+    }
+
+    private fun isNumeric(assistantResponse: String): Boolean {
+        return assistantResponse.all { char -> char.isDigit() }
+    }
+
     private fun call(name: String, userId: String) {
         Log.i("CallHelpCalling", "Received name: $name, Received user id: $userId")
         robot.finishConversation()
-        robot.speak(TtsRequest.create(getString(R.string.nameSpeech) + name))
+        speak(getString(R.string.nameSpeech) + name)
         robot.startTelepresence(name, userId)
     }
-
-    override fun onWakeupWord(wakeupWord: String, direction: Int) {
-        robot.tiltBy(55, 0.5f)
-        Log.i("WakeUp", "Wake up world $wakeupWord")
-        val serviceIntent = Intent(this, CameraService::class.java)
-        startService(serviceIntent)
-    }
-
-    //after service finished
+    //after camera service finished
     private val mMessageReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent) {
             // Get extra data included in the Intent
@@ -415,7 +473,21 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
         return MultipartBody.Part.createFormData("image", imageFile.name, filePart)
     }
 
-    override fun onGoToLocationStatusChanged(location: String, status: String, descriptionId: Int, description: String) {
-        println("Location: $location, Status: $status, DescriptionId: $descriptionId")
+    private fun runAlarm() {
+        isAlarm = true
+        speak("לקוחות שימו לב, הופעלה אזעקת צבע אדום")
+        Thread.sleep(5000)
+        speak("לקוחות שימו לב, הופעלה אזעקת צבע אדום")
+        Thread.sleep(5000)
+        mediaPlayer?.start()
+        Thread.sleep(13000)
+        speak("נא לגשת למרחב המוגן הנמצא ליד המעלית")
+        Thread.sleep(5000)
+        speak("נא לגשת למרחב המוגן הנמצא ליד המעלית")
+        Thread.sleep(5000)
+        alarmService = AlarmService()
+        alarmService!!.start()
+
     }
+
 }

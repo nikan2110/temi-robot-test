@@ -19,7 +19,6 @@ public class MailService {
             Properties properties = new Properties();
             properties.setProperty("mail.imap.ssl.enable", "true");
             Session emailSession = Session.getDefaultInstance(properties);
-            //create the POP3 store object and connect with the pop server
             Store store = emailSession.getStore("imap");
             store.connect(host, 993, username, password);
             //create the folder object and open it
@@ -30,7 +29,7 @@ public class MailService {
             Log.i("Mail service", "Messages length---" + messages.length);
             for (Message message : messages) {
                 String msg = message.getSubject().toString();
-                if (msg.contains("robot")) {
+                if (msg.contains("Alarm")) {
                     flag = true;
                 }
                 message.setFlag(Flags.Flag.DELETED, true);

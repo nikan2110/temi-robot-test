@@ -35,4 +35,5 @@
     <string name="find">Find</string>
     <string name="play_movie">Play movie</string>
     <string name="back_to_main_menu">Back to main menu</string>
+    <string name="stop_alarm">Stop alarm</string>
 </resources>
