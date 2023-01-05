@@ -28,6 +28,7 @@ import com.robotemi.sdk.model.CallEventModel
 import meuhedet.com.temitestappl.dto.ResponseCameraDto
 import meuhedet.com.temitestappl.retrofit.RetrofitClient
 import meuhedet.com.temitestappl.services.*
+import meuhedet.com.temitestappl.utils.Constants
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Call
@@ -37,8 +38,7 @@ import java.io.File
 
 
 class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListener,
-    OnBeWithMeStatusChangedListener, Robot.WakeupWordListener, OnGoToLocationStatusChangedListener,
-    OnFaceRecognizedListener {
+    OnBeWithMeStatusChangedListener, Robot.WakeupWordListener, OnGoToLocationStatusChangedListener {
 
     // ========================== App components =================================================
 
@@ -188,7 +188,6 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
         robot.addOnBeWithMeStatusChangedListener(this)
         robot.addWakeupWordListener(this)
         robot.addOnGoToLocationStatusChangedListener(this)
-        robot.addOnFaceRecognizedListener(this)
 
     }
 
@@ -204,7 +203,6 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
         robot.removeOnBeWithMeStatusChangedListener(this)
         robot.removeWakeupWordListener(this)
         robot.removeOnGoToLocationStatusChangedListener(this)
-        robot.removeOnFaceRecognizedListener(this)
     }
 
     override fun onRobotReady(isReady: Boolean) {
@@ -238,7 +236,7 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
         }
         when {
             asrResult.contains("הצילו", ignoreCase = true) -> {
-                robot.askQuestion(getString(R.string.הצילו))
+                askQuestion(getString(R.string.הצילו))
             }
             asrResult.contains("תתקשרי", ignoreCase = true) -> {
                 if(asrResult.length >= 8) {
@@ -248,13 +246,13 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
 
             }
             asrResult.contains("שגיאה", ignoreCase = true) -> {
-                robot.askQuestion(getString(R.string.שגיאה))
+                askQuestion(getString(R.string.שגיאה))
             }
             asrResult.contains("אנשי קשר מרובים", ignoreCase = true) -> {
-                robot.askQuestion(getString(R.string.multiplyNames))
+                askQuestion(getString(R.string.multiplyNames))
             }
             asrResult.contains("חדשות", ignoreCase = true) -> {
-                robot.askQuestion("על איזה נושא לחפש חדשות?")
+                askQuestion("על איזה נושא לחפש חדשות?")
             }
             asrResult.contains("בסדר", ignoreCase = true) -> {
                 if (followService != null) {
@@ -270,7 +268,7 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
                 val quantityArticles = articles.size
                 Log.i("NewsServiceAsr", "Quantity of articles are: $quantityArticles")
                 if (quantityArticles == 0) {
-                    return robot.askQuestion("לא הצלחתי למצוא מאמרים בנושא זה, רוצה לשאול משהו אחר?")
+                    return askQuestion("לא הצלחתי למצוא מאמרים בנושא זה, רוצה לשאול משהו אחר?")
                 }
                 if (quantityArticles == 1) {
                     val article = articles.get(0)
@@ -279,7 +277,7 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
                     val numberOfArticle = (0..quantityArticles - 1).random()
                     val article = articles.get(numberOfArticle)
                     val articleWithQuestion = article.description + "רוצה לשאול משהו אחר?"
-                    robot.askQuestion(articleWithQuestion)
+                    askQuestion(articleWithQuestion)
                 }
             }
             else -> {
@@ -298,10 +296,10 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
                     } else {
                         responseAfterTranslate = assistantResponse
                     }
-                    robot.askQuestion(responseAfterTranslate)
+                    askQuestion(responseAfterTranslate)
                 } catch (err: Exception) {
                     Log.e("ChatBotAsr", "ERROR: ${err.message}")
-                    robot.askQuestion(getString(R.string.other))
+                    askQuestion(getString(R.string.other))
                 }
             }
         }
@@ -330,14 +328,6 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
         Log.i("Location description", description)
     }
 
-    override fun onFaceRecognized(contactModelList: List<ContactModel>) {
-        Log.i("Face Recognize listener", "Listener start")
-        contactModelList.forEach {
-            greeting(it.firstName)
-        }
-        robot.stopFaceRecognition()
-
-    }
 
     override fun onWakeupWord(wakeupWord: String, direction: Int) {
         // ====================== Face recognition with Python server ================================
@@ -345,8 +335,6 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
 //        Log.i("WakeUp", "Wake up world $wakeupWord")
 //        val serviceIntent = Intent(this, CameraService::class.java)
 //        startService(serviceIntent)
-        // ====================== Face recognition with Temi center ================================
-        robot.startFaceRecognition()
     }
 
     // ========================== My function ====================================================
@@ -391,11 +379,11 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
     }
 
     fun greeting(name: String) {
-        robot.askQuestion("שלום $name. איך אוכל לעזור לך?")
+        askQuestion("שלום $name. איך אוכל לעזור לך?")
     }
 
     fun askQuestion(question: String) {
-        robot.askQuestion(  question)
+        robot.askQuestion(question)
     }
 
     fun speak(text:String) {
@@ -475,19 +463,19 @@ class MainActivity : AppCompatActivity(), OnRobotReadyListener, Robot.AsrListene
 
     private fun runAlarm() {
         isAlarm = true
-        speak("לקוחות שימו לב, הופעלה אזעקת צבע אדום")
+        speak(getString(R.string.before_alarm))
         Thread.sleep(5000)
-        speak("לקוחות שימו לב, הופעלה אזעקת צבע אדום")
+        speak(getString(R.string.before_alarm))
         Thread.sleep(5000)
         mediaPlayer?.start()
         Thread.sleep(13000)
-        speak("נא לגשת למרחב המוגן הנמצא ליד המעלית")
+        speak(getString(R.string.after_alarm))
         Thread.sleep(5000)
-        speak("נא לגשת למרחב המוגן הנמצא ליד המעלית")
+        speak(getString(R.string.after_alarm))
         Thread.sleep(5000)
-        alarmService = AlarmService()
-        alarmService!!.start()
-
+        speak(getString(R.string.before_call))
+        Thread.sleep(10000)
+        call(Constants.USER_NAME, Constants.USER_ID)
     }
 
 }

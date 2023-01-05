@@ -5,9 +5,11 @@ import meuhedet.com.temitestappl.models.Question
 
 object Constants {
 
-    const val USER_NAME: String = "user_name"
+
     const val NEWS_SERVICE: String = "http://192.168.146.227:8080/news/"
     const val QUEUE_SERVICE: String = "http://192.168.146.227:8000/queue/order/"
+    const val USER_ID = "062757e0ffbe70a80f77f18d548a35f1" // 062757e0ffbe70a80f77f18d548a35f1 - Viktor; 7738b80514a452cd3fe60f9d4c377d76 - Yaki
+    const val USER_NAME = "Victor Bero" // Victor Bero - Viktor; יקי סלומון - Yaki
     val OPTION1: String = getEmojiByUnicode(0x1F60A) + "מרוצה במידה רבה מאוד "
     val OPTION2: String = getEmojiByUnicode(0x1F60C) + "מרוצה במידה רבה "
     val OPTION3: String = getEmojiByUnicode(0x1F614) + "מרוצה במידה בינונית "

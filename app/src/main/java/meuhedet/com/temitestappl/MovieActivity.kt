@@ -19,7 +19,7 @@ class MovieActivity : AppCompatActivity() {
         videoView = findViewById(R.id.vw_movie)
         buttonBack = findViewById(R.id.btn_back)
 
-        var uriVideo = Uri.parse("/storage/emulated/0/Download/מאוחדת - רמה אחרת גם ברפואת ילדים!.mkv")
+        val uriVideo = Uri.parse("/storage/emulated/0/Download/מאוחדת - רמה אחרת גם ברפואת ילדים!.mkv")
         videoView.setVideoPath(uriVideo.toString())
         videoView.start()
 

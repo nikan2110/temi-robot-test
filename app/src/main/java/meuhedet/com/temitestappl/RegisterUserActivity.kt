@@ -67,7 +67,6 @@ class RegisterUserActivity : AppCompatActivity() {
         activityResultLauncher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult(),
             ActivityResultCallback {
-                println(it.resultCode)
                 if (it.resultCode == RESULT_OK) {
 //                    var bundle = it.data!!.extras
 //                    var bitMap: Bitmap? = bundle?.get("data") as? Bitmap

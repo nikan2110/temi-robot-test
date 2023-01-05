@@ -91,7 +91,7 @@ class QuizQuestionActivity : AppCompatActivity(), View.OnClickListener {
 
     private fun selectedOptionView(iv: ImageView, selectedOptionNum: Int) {
         defaultOptionsView()
-        var smilesWithoutChoose = smiles.filter { ivList -> ivList.id != iv.id }
+        val smilesWithoutChoose = smiles.filter { ivList -> ivList.id != iv.id }
         smilesWithoutChoose.forEach { iv -> iv.background = ContextCompat.getDrawable(this, com.google.android.material.R.drawable.m3_tabs_transparent_background)}
         selectedOptionPosition = selectedOptionNum
         btnSubmitQuestion.background = ContextCompat.getDrawable(this, R.drawable.check_mark)

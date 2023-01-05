@@ -36,4 +36,7 @@
     <string name="play_movie">Play movie</string>
     <string name="back_to_main_menu">Back to main menu</string>
     <string name="stop_alarm">Stop alarm</string>
+    <string name="before_alarm">לקוחות שימו לב, הופעלה אזעקת צבע אדום</string>
+    <string name="after_alarm">נא לגשת למרחב המוגן הנמצא ליד המעלית</string>
+    <string name="before_call">בעלי מוגבלות אשר אינם יכולים להגיע למרחב המוגן, מתבקשים להגיע לחדר 9, החדר הכי מוגן שיש</string>
 </resources>
